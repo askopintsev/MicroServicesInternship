@@ -1,0 +1,50 @@
+[
+  {
+    "model": "goods_service.Ad",
+    "pk": 1,
+    "fields": {
+      "short_descr": "Гараж",
+      "full_descr": "Продам гараж. Тел. 88005553535",
+      "views_cnt": "0",
+      "created_at": "2020-07-15 10:10:10",
+      "photo": "",
+      "price": "322"
+    }
+  },
+  {
+    "model": "goods_service.Ad",
+    "pk": 2,
+    "fields": {
+      "short_descr": "Машина",
+      "full_descr": "Продам машину. Не бита, не крашена, без пробега по РФ",
+      "views_cnt": "0",
+      "created_at": "2020-07-15 11:11:11",
+      "photo": "",
+      "price": "9000"
+    }
+  },
+  {
+    "model": "goods_service.Tag",
+    "pk": 1,
+    "fields": {
+      "tag_name": "Garage",
+      "ad": [1]
+    }
+  },
+  {
+    "model": "goods_service.Tag",
+    "pk": 2,
+    "fields": {
+      "tag_name": "Sell",
+      "ad": [1, 2]
+    }
+  },
+  {
+    "model": "goods_service.Tag",
+    "pk": 3,
+    "fields": {
+      "tag_name": "Car",
+      "ad": [2]
+    }
+  }
+]
