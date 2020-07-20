@@ -1,28 +1,35 @@
 version: '3.8'
+
 services:
-  web:
-    container_name: avidjango_web
-    build: ./goods  
-      dockerfile: Dockerfile
-      command: python manage.py runserver 0.0.0.0:8000
+  db:
+    image: postgres:10
     environment:
-      DEBUG: 1
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: db
-      POSTGRES_HOST: localhost
-    volumes:
-      - .:/goods
-    ports:
-      - "${HTTP_PORT:-8000}:8000"
-    depends_on:
-      - db
-  db:
-    container_name: avidjango_db
-    image: postgres:11
-    volumes:
-      - postgres_data:/var/lib/posgresql/data/
+      POSTGRES_HOST: db
     ports:
       - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/posgresql/data/
+  web:
+    build:
+      context: .
+      dockerfile: ./goods/Dockerfile
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: db
+      POSTGRES_HOST: db
+    command: bash -c "python ./goods/manage.py migrate
+                   && python ./goods/manage.py loaddata ./goods/goods_service/fixtures/initial_data.json
+                   && python ./goods/manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "${HTTP_PORT:-8000}:8000"
+    volumes:
+      - .:/goods
+    depends_on:
+      - db
+
 volumes:
   postgres_data:

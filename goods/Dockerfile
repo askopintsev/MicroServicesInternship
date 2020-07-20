@@ -4,6 +4,6 @@ ENV PYTHONUNBUFFERED 1
 
 RUN mkdir /goods
 WORKDIR /goods
-COPY requirements.txt /goods
+COPY /goods/requirements.txt /goods
 ADD . /goods
 RUN pip install -r requirements.txt
