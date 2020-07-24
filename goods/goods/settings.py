@@ -24,9 +24,9 @@ SECRET_KEY = ")i^px#4+7o3!50)+-igx5!y4xou7lj8s1@f5eyga7xt--@_vs@"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = True
-DEBUG = int(os.environ.get("DEBUG", default=0))
+DEBUG = int(os.environ.get("DEBUG", default=1))
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -40,13 +40,15 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "goods_service",
     "rest_framework",
+    "rest_framework_swagger",
 ]
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
-        # 'rest_framework.renderers.BrowsableAPIRenderer',
-    ]
+        # "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
+    "DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.coreapi.AutoSchema",
 }
 
 MIDDLEWARE = [
@@ -91,6 +93,12 @@ DATABASES = {
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", default="postgres"),
         "HOST": os.environ.get("POSTGRES_HOST", default="localhost"),
         "PORT": 5432,
+        # "ENGINE": "django.db.backends.postgresql_psycopg2",
+        # "NAME": "db",
+        # "USER": "postgres",
+        # "PASSWORD": "postgres",
+        # "HOST": "localhost",
+        # "PORT": 5432,
     }
 }
 

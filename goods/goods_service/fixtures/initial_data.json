@@ -5,6 +5,7 @@
     "fields": {
       "short_descr": "Гараж",
       "full_descr": "Продам гараж. Тел. 88005553535",
+      "tag": [1,2],
       "views_cnt": "0",
       "created_at": "2020-07-14 10:10:10",
       "photo": "",
@@ -17,6 +18,7 @@
     "fields": {
       "short_descr": "Машина",
       "full_descr": "Продам машину. Не бита, не крашена, без пробега по РФ",
+      "tag": [2],
       "views_cnt": "0",
       "created_at": "2020-07-15 11:11:11",
       "photo": "",
@@ -29,6 +31,7 @@
     "fields": {
       "short_descr": "Продам или обменяю 100 рублей",
       "full_descr": "Торг не уместен. Самовывоз. Константин",
+      "tag": [2],
       "views_cnt": "0",
       "created_at": "2020-07-16 12:12:12",
       "photo": "",
@@ -41,6 +44,7 @@
     "fields": {
       "short_descr": "Ведро шариковых мышек",
       "full_descr": "Ведро шариковых мышек",
+      "tag": [2,3],
       "views_cnt": "0",
       "created_at": "2020-07-18 13:13:13",
       "photo": "",
@@ -53,6 +57,7 @@
     "fields": {
       "short_descr": "Продаю фантик от конфеты",
       "full_descr": "Красивый фантик, блестит и шелестит. Конфета была вкусной. Отдам по дешевке",
+      "tag": [2,4],
       "views_cnt": "0",
       "created_at": "2020-07-19 13:13:13",
       "photo": "",
@@ -65,6 +70,7 @@
     "fields": {
       "short_descr": "Ищу работу сисадмина",
       "full_descr": "Большой опыт. Гот. Могу сидеть и смотреть на мигающие лампочки сервера",
+      "tag": [3, 5],
       "views_cnt": "0",
       "created_at": "2020-07-20 13:13:13",
       "photo": "",
@@ -75,40 +81,35 @@
     "model": "goods_service.Tag",
     "pk": 1,
     "fields": {
-      "tag_name": "Garage",
-      "ad": [1]
+      "tag_name": "Garage"
     }
   },
   {
     "model": "goods_service.Tag",
     "pk": 2,
     "fields": {
-      "tag_name": "Sell",
-      "ad": [1, 2, 3, 4, 5]
+      "tag_name": "Sell"
     }
   },
   {
     "model": "goods_service.Tag",
     "pk": 3,
     "fields": {
-      "tag_name": "IT",
-      "ad": [4, 6]
+      "tag_name": "IT"
     }
   },
   {
     "model": "goods_service.Tag",
     "pk": 4,
     "fields": {
-      "tag_name": "Candy",
-      "ad": [5]
+      "tag_name": "Candy"
     }
   },
   {
     "model": "goods_service.Tag",
     "pk": 5,
     "fields": {
-      "tag_name": "Job",
-      "ad": [6]
+      "tag_name": "Job"
     }
   }
 ]

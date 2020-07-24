@@ -2,20 +2,20 @@ import os
 import sys
 from datetime import datetime, timedelta
 
-from django.db.models import F
+from django.db.models import Q
 
 import requests
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
-from .models import Ad, Tag
-from .serializers import AdFullSerializer, AdShortSerializer, TagListSerializer
+from .serializers import *
 from .utils import DiskWorker
 
 
 class TagDistinctListView(generics.ListAPIView):
     """Class for Tags view.
-    API endpoint: /api/tags"""
+    API endpoint: /api/ad/tags"""
 
     serializer_class = TagListSerializer
     queryset = Tag.objects.all().distinct()
@@ -23,7 +23,7 @@ class TagDistinctListView(generics.ListAPIView):
 
 class AdShortDescrView(generics.RetrieveAPIView):
     """Class for Short Ad info view.
-    API endpoint: /api/short/id"""
+    API endpoint: /api/ad/id/short_info"""
 
     serializer_class = AdShortSerializer
 
@@ -34,83 +34,68 @@ class AdShortDescrView(generics.RetrieveAPIView):
         return queryset
 
 
-class AdFullDescrView(generics.RetrieveAPIView):
+class AdFullDescrView(generics.RetrieveUpdateAPIView):
     """Class for Full Ad info view.
-    API endpoint: /api/full/id"""
+    API endpoint: /api/ad/id"""
 
-    serializer_class = AdFullSerializer
+    queryset = Ad.objects.all()
+    serializer_class = AdShowFullSerializer
 
-    def get_queryset(self):
-        ad_id = self.kwargs["pk"]
-        queryset = Ad.objects.filter(id=ad_id)
+    # for GET requests
+    def retrieve(self, request, *args, **kwargs):
 
-        # updating views count
-        queryset.filter(id=ad_id).update(views_cnt=F("views_cnt") + 1)
+        instance = self.get_object()
+        # updating views count for ad
+        instance.view_increment()
 
-        return queryset
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
+        return Response(serializer.data)
 
-class AdUpdateView(generics.RetrieveUpdateAPIView):
-    """Class for Ad parameters updating view.
-    API endpoint: /api/update/id/+params"""
+    # for PUT/PATCH requests
+    def update(self, request, *args, **kwargs):
 
-    serializer_class = AdFullSerializer
+        partial = kwargs.pop("partial", False)
 
-    def get_queryset(self):
-        ad_id = self.kwargs["pk"]
-        queryset = Ad.objects.filter(id=ad_id)
+        instance = self.get_object()
+        instance.edit_time_update()
 
-        # receiving params value from request or get current value from DB
-        ad_short_descr = self.request.query_params.get(
-            "short_descr", queryset.values("short_descr").get()["short_descr"]
-        )
-        ad_full_descr = self.request.query_params.get(
-            "full_descr", queryset.values("full_descr").get()["full_descr"]
-        )
-        ad_price = self.request.query_params.get(
-            "price", queryset.values("price").get()["price"]
-        )
+        serializer = AdUpdateSerializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
 
-        queryset.filter(id=ad_id).update(
-            short_descr=ad_short_descr,
-            full_descr=ad_full_descr,
-            price=ad_price,
-            updated_at=datetime.now(),
-        )
+        if getattr(instance, "_prefetched_objects_cache", None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
 
-        return queryset
+        return Response(serializer.data)
 
 
-class AdFilterTagsView(generics.ListAPIView):
-    """Class for Ad filtering using tags.
-    API endpoint: /api/tagsfilter/?tags=value1,value2"""
+class AdFilterView(generics.ListAPIView):
+    """Class for Ad filtering ads.
+    API endpoint: /api/ad/filter/?params"""
 
-    serializer_class = AdFullSerializer
+    serializer_class = AdShowFullSerializer
+    # queryset = Ad.objects.all()
+    filterset_fields = ("tag", "created_at", "price")
 
     def get_queryset(self):
+
+        # handling tags filter
         tags = self.request.query_params.get("tags", None)
-        if tags is not None:
+        if tags:
             tags = tags.split(",")
+            queryset = Ad.objects.filter(Q(tag__tag_name__in=tags))
         else:
-            raise ValidationError(
-                "Please enter at least one tag or several tags separated with comma"
-            )
-        queryset = Ad.objects.filter(tag__tag_name__in=tags)
+            queryset = Ad.objects.all()
 
-        return queryset
-
-
-class AdFilterDatesView(generics.ListAPIView):
-    """Class for Ad filtering using dates of creation.
-    API endpoint: /api/datesfilter/+params"""
-
-    serializer_class = AdFullSerializer
-
-    def get_queryset(self):
-        # handling of min_date param
+        # handling of min_date param filter
         try:
-            min_date = self.request.query_params.get("min_date", None)
-            if min_date is not None:
+            min_date = self.request.query_params.get("min_date")
+            if min_date:
                 min_date_dt = datetime.strptime(min_date, "%Y-%m-%d")
             else:
                 min_date_dt = datetime.strptime("1900-01-01", "%Y-%m-%d")
@@ -119,10 +104,10 @@ class AdFilterDatesView(generics.ListAPIView):
                 'Incorrect min_date format. Please use format "YYYY-MM-DD"'
             )
 
-        # handling of max_date param
+        # handling of max_date param filter
         try:
-            max_date = self.request.query_params.get("max_date", None)
-            if max_date is not None:
+            max_date = self.request.query_params.get("max_date")
+            if max_date:
                 max_date_dt = datetime.strptime(max_date, "%Y-%m-%d")
             else:
                 max_date_dt = datetime.now() + timedelta(days=1)
@@ -131,59 +116,73 @@ class AdFilterDatesView(generics.ListAPIView):
                 'Incorrect max_date format. Please use format "YYYY-MM-DD"'
             )
 
-        queryset = Ad.objects.filter(created_at__range=(min_date_dt, max_date_dt))
-
-        return queryset
-
-
-class AdFilterPriceView(generics.ListAPIView):
-    """Class for Ad filtering using price.
-    API endpoint: /api/pricefilter/+params"""
-
-    serializer_class = AdFullSerializer
-
-    def get_queryset(self):
-        # handling min_price
-        min_price = self.request.query_params.get("min_price", None)
+        # handling min_price filter
+        min_price = self.request.query_params.get("min_price")
         if min_price is None:
             min_price = 0
 
-        # handling max_price
-        max_price = self.request.query_params.get("max_price", None)
+        # handling max_price filter
+        max_price = self.request.query_params.get("max_price")
         if max_price is None:
             max_price = sys.maxsize
 
-        queryset = Ad.objects.filter(price__range=(min_price, max_price))
+        # getting final data
+        queryset = queryset.filter(
+            Q(created_at__range=(min_date_dt, max_date_dt)),
+            Q(price__range=(min_price, max_price)),
+        )
 
         return queryset
 
 
-class AdImageHandlerView(generics.RetrieveUpdateDestroyAPIView):
+class AdImageHandlerView(generics.UpdateAPIView):
     """Class for Ad image management.
     Supports features: add image, update image, delete image.
     Image is stored in /static/ directory and saved as path to file in DB.
-    API endpoint: /api/image/id/+params"""
+    API endpoint: /api/ad/id/image/command/+url"""
 
-    serializer_class = AdFullSerializer
+    serializer_class = AdPhotoSerializer
+    queryset = Ad.objects.all()
 
-    def get_queryset(self):
-        ad_id = self.kwargs["pk"]
-        queryset = Ad.objects.filter(pk=ad_id)
+    def update(self, request, *args, **kwargs):
 
-        # handling command type
-        command = self.request.query_params.get("command", None)
-        # add and update are the same in fact
-        if command == "add" or command == "update":
-            image_url = self.request.query_params.get("image_url", None)
+        partial = self.kwargs.pop("partial", False)
 
-            # get image data, save to disk and store the path in DB
-            if image_url is not None:
-                image = requests.get(image_url)
-                image_path = DiskWorker().save_to_disk(image.content, ad_id)
-                queryset.filter(pk=ad_id).update(photo=image_path)
+        if self.kwargs["command"] in ("add", "update"):
+            # getting image data
+            image_url = request.data.get("photo")
+            image = requests.get(image_url)
+            image_path = DiskWorker().save_to_disk(image.content, self.kwargs["pk"])
 
-        if command == "delete":
-            os.remove(queryset.values("photo").get()["photo"])
-            queryset.filter(pk=ad_id).update(photo=None)
+            # updating instance with new image info
+            instance = self.get_object()
+            if len(instance.photo) > 0:  # check if image data exist, then delete
+                os.remove(instance.photo)
+            instance.update_photo(image_path)
+            instance.edit_time_update()
 
-        return queryset
+            # sending new image info to serializer
+            serializer = self.get_serializer(
+                instance, data={"photo": image_path}, partial=partial
+            )
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+
+        if self.kwargs["command"] == "delete":
+            # removing image from DB and local directory
+            instance = self.get_object()
+            os.remove(instance.photo)
+
+            # updating info in serializer
+            serializer = self.get_serializer(
+                instance, data={"photo": None}, partial=partial
+            )
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+
+        if getattr(instance, "_prefetched_objects_cache", None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
