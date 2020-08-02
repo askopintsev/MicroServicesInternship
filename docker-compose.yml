@@ -1,21 +1,33 @@
-version: '3.8'
+version: '2.4'
 
 services:
   db:
-    image: postgres:10
+    image: db
+    build:
+      context: .
+      dockerfile: ./postgre_dockerfile/Dockerfile
+      network: my_network
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: db
       POSTGRES_HOST: db
-    ports:
-      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/posgresql/data/
-  web:
+    ports:
+      - "5432:5432"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  
+  goods:
     build:
       context: .
       dockerfile: ./goods/Dockerfile
+      network: my_network
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -30,6 +42,36 @@ services:
       - .:/goods
     depends_on:
       - db
+
+  redis_db:
+    image: 'bitnami/redis:latest'
+    environment:
+      ALLOW_EMPTY_PASSWORD: "yes"
+      REDIS_HOST: redis_db
+    ports:
+      - "6379:6379"
+
+  users:
+    build:
+      context: .
+      dockerfile: ./user_service/Dockerfile
+      network: my_network
+    environment:
+      REDIS_HOST: redis_db
+      POSTGRES_DB: users
+      POSTGRES_HOST: db
+    command: bash -c "cd user_service
+                      && alembic upgrade head
+                      && python start.py"
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/user_service
+    depends_on:      
+      redis_db:
+        condition: service_started
+      db: 
+        condition: service_healthy
 
 volumes:
   postgres_data:

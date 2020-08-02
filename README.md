@@ -1,8 +1,94 @@
 # AviDjango service documentation
 
-### API description
+### User_service API description
+User_service API provides the following features:
+<hr/>
 
-AviDjango API provides the following features:
+* **Register in the service**
+
+**URL:**  /register
+
+Obligatory parameters:
+- username
+- password
+
+You need to specify 'username' and 'password' parameters values 
+to create your new user.
+Your username must be unique, 
+so you will receive system message if it's not.
+
+After successfull request user will be created 
+and you will be ready to login.
+
+<hr/>
+
+* **Login into the service**
+
+**URL:**  /login
+
+Obligatory parameters:
+- username
+- password
+
+You need to pass authentification, so you need to enter
+username and password of your created user. Otherwise, you
+will receive error messages.
+After successfull login you will be able to use the service.
+
+Remember that session length is 15 minutes. 
+After this period you can re-login 
+or refresh your session with "/refresh" url.
+
+<hr/>
+
+* **Get and update profile info**
+
+**URL:**  /profile
+
+Non-obligatory parameters:
+- new_username
+- new_password
+
+You need to be authorized to use this endpoint.
+
+You can get your current profile info using this URL, such as:
+user_id, username, password.
+
+If you want to update your username or profile, 
+you need to pass "new_username" and/or "new_password" 
+via request.
+
+<hr/>
+
+* **Refresh your session**
+
+**URL:**  /refresh
+
+You need to be authorized to use this endpoint.
+
+If your session is older than 15 minutes - 
+it will expire. But you can refresh your session
+using this URL without need to re-login.
+
+Session refresh will work only for 
+3 hours after your login action.
+<hr/>
+
+* **Logout from system**
+
+**URL:**  /logout
+
+You need to be authorized to use this endpoint.
+
+You can end your session using this endpoint.
+After that you need to login into system again 
+to use system.
+
+<hr/>
+
+### Goods_service API description
+
+Goods_service API provides the following features:
 <hr/>
 
 * **Get full list of existing tags in ads**:
