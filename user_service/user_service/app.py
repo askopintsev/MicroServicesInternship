@@ -31,7 +31,7 @@ async def create_app():
 
 async def on_start(app):
     app["db"] = await asyncpgsa.create_pool(
-        dsn="postgresql://postgres:postgres@db:5432/users"
+        dsn="postgresql://postgres:postgres@localhost:5432/users"
     )
 
 

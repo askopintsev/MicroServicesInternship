@@ -17,6 +17,5 @@ class User(Base):
     password = Column(String(200), nullable=False)
 
     def __init__(self, username, password):
-        self.id = uuid.uuid4()
         self.username = username
         self.password = password

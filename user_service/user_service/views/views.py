@@ -1,5 +1,6 @@
 import datetime
 import json
+import os
 
 import aiohttp
 import argon2
@@ -7,10 +8,10 @@ import asyncpg
 import jwt
 import sqlalchemy as sa
 from aiohttp_session import get_session, new_session
-
+from functools import wraps
 from user_service import model
 
-SECRET = "YouShallNotPass"
+SECRET = str(os.environ.get("SECRET"))
 
 
 def generate_tokens(user_id):
@@ -44,8 +45,8 @@ def jwt_decode(jwt_token):
 
     try:
         decoded_jwt = jwt.decode(jwt_token, SECRET, algorithms="HS256")
-    except jwt.ExpiredSignatureError:
-        decoded_jwt = "Expired jwt"
+    except jwt.ExpiredSignatureError as err:
+        return str(err)
 
     return decoded_jwt
 
@@ -53,14 +54,16 @@ def jwt_decode(jwt_token):
 def login_required(func):
     """Decorator-function allows to pass to views for authorised users only"""
 
+    @wraps(func)
     async def wrapped(self, *args, **kwargs):
 
         # get access token string from header
         access_check = self.headers.get("Authorization", None)
         if access_check is None:
-            return aiohttp.web.Response(
-                text=json.dumps("User unauthorised"), status=403
-            )
+            return aiohttp.web.json_response(data={"success": False,
+                                                   "reason": "User unauthorised"},
+                                             status=403
+                                             )
 
         # remove 'Bearer ' string from access token string
         access_check = access_check[7:]
@@ -70,9 +73,10 @@ def login_required(func):
         try:
             session[access_check]
         except KeyError:
-            return aiohttp.web.Response(
-                text=json.dumps("User unauthorised (wrong token)"), status=403
-            )
+            return aiohttp.web.json_response(data={"success": False,
+                                                   "reason": "User unauthorised (wrong token)"},
+                                             status=403
+                                             )
 
         # check expiration of access token and decode access token payload
         decoded_access = jwt_decode(access_check)
@@ -82,9 +86,10 @@ def login_required(func):
             if self.path == "/refresh":
                 return await func(self, access_check, *args, **kwargs)
             else:
-                return aiohttp.web.Response(
-                    text=json.dumps("You need to re-login"), status=403
-                )
+                return aiohttp.web.json_response(data={"success": False,
+                                                       "reason": "You need to re-login"},
+                                                 status=403
+                                                 )
 
         return await func(self, access_check, *args, **kwargs)
 
@@ -101,30 +106,31 @@ async def register(request):
         username = request.query["username"]
         password = request.query["password"]
     except KeyError:
-        return aiohttp.web.Response(
-            text=json.dumps("Username and password required"), status=403
-        )
-
-    # user object creation
-    user = model.User(username, argon2.PasswordHasher().hash(password))
+        return aiohttp.web.json_response(data={"success": False,
+                                               "message": "Username and password required"},
+                                         status=403
+                                         )
 
     # saving user to DB with check of username duplication
     async with request.app["db"].acquire() as conn:
         try:
             await conn.execute(
                 sa.insert(model.User).values(
-                    id=user.id, username=user.username, password=user.password
+                    username=username,
+                    password=argon2.PasswordHasher().hash(password)
                 )
             )
 
         except asyncpg.exceptions.UniqueViolationError:
-            return aiohttp.web.Response(
-                text=json.dumps("Username already exists"), status=403
-            )
+            return aiohttp.web.json_response(data={"success": False,
+                                                   "message": "Username already exists"},
+                                             status=403
+                                             )
 
-    return aiohttp.web.Response(
-        text=json.dumps("User " + user.username + " was created"), status=200
-    )
+    return aiohttp.web.json_response(data={"success": True,
+                                           "message": "User " + username + " was created"},
+                                     status=201
+                                     )
 
 
 async def login(request):
@@ -137,9 +143,10 @@ async def login(request):
         username = request.query["username"]
         password = request.query["password"]
     except KeyError:
-        return aiohttp.web.Response(
-            text=json.dumps("Username and password required"), status=403
-        )
+        return aiohttp.web.json_response(data={"success": False,
+                                               "message": "Username and password required"},
+                                         status=403
+                                         )
 
     # query to select user profile info
     query = sa.select("*").where(model.User.username == username)
@@ -154,9 +161,10 @@ async def login(request):
             try:
                 argon2.PasswordHasher().verify(pass_db, password)
             except argon2.exceptions.VerifyMismatchError:
-                return aiohttp.web.Response(
-                    text=json.dumps("Wrong password"), status=200
-                )
+                return aiohttp.web.json_response(data={"success": False,
+                                                       "message": "Wrong password"},
+                                                 status=403
+                                                 )
 
             # creating session
             session = await new_session(request)
@@ -169,17 +177,22 @@ async def login(request):
             # save tokens to session
             session[str(access_jwt)] = str(refresh_jwt)
 
-            return aiohttp.web.Response(text=json.dumps("You are logged"), status=200)
+            return aiohttp.web.json_response(data={"success": True,
+                                                   "message": "You are logged"},
+                                             status=200
+                                             )
         else:
-            return aiohttp.web.Response(text=json.dumps("User not found"), status=403)
+            return aiohttp.web.json_response(data={"success": False,
+                                                   "message": "User not found"},
+                                             status=403
+                                             )
 
 
 @login_required
 async def profile(request, access_check):
-    """View for user information. By default shows user info based on user_id from token.
+    """View for user information.
     Accepts input param 'access_check' as decoded access token payload from wrapper function login_required.
-    Accepts non-obligatory 'new_username' and 'new_password' params from request
-    and updates user profile if they are not empty"""
+    Shows user info based on user_id from token."""
 
     # getting user_if from current access token
     decoded_access = jwt_decode(access_check)
@@ -187,6 +200,33 @@ async def profile(request, access_check):
 
     # query for user profile info select
     query_select = sa.select("*").where(model.User.id == user_id)
+
+    # retrieve user profile data block
+    async with request.app["db"].acquire() as conn:
+        result = await conn.fetchrow(query_select)
+    user_id = str(result["id"])
+    username = result["username"]
+    password = result["password"]
+
+    return aiohttp.web.json_response(data={"success": True,
+                                           "message": {"user_id": user_id,
+                                                       "username": username,
+                                                       "password": password}
+                                           },
+                                     status=200
+                                     )
+
+
+@login_required
+async def profile_update(request, access_check):
+    """View for updating user information.
+    Accepts input param 'access_check' as decoded access token payload from wrapper function login_required.
+    Accepts non-obligatory 'new_username' and 'new_password' params from request
+    and updates user profile if they are not empty"""
+
+    # getting user_if from current access token
+    decoded_access = jwt_decode(access_check)
+    user_id = decoded_access["user_id"]
 
     # getting params for profile update
     new_username = request.query.get("new_username", None)
@@ -202,33 +242,19 @@ async def profile(request, access_check):
         sa.update(model.User).values(update_dict).where(model.User.id == user_id)
     )
 
-    # retrieve user profile data block
-    if len(update_dict) == 0:
-        async with request.app["db"].acquire() as conn:
-            result = await conn.fetchrow(query_select)
-        user_id = str(result["id"])
-        username = result["username"]
-        password = result["password"]
-
-        return aiohttp.web.Response(
-            text=json.dumps(
-                {"user_id": user_id, "username": username, "password": password}
-            ),
-            status=200,
-        )
-
     # update user profile data block
-    else:
-        async with request.app["db"].acquire() as conn:
-            try:
-                await conn.fetchrow(query_update)
-            except asyncpg.exceptions.UniqueViolationError:
-                return aiohttp.web.Response(
-                    text=json.dumps("Username already exists"), status=403
-                )
-            return aiohttp.web.Response(
-                text=json.dumps("Profile data updated"), status=200
-            )
+    async with request.app["db"].acquire() as conn:
+        try:
+            await conn.fetchrow(query_update)
+        except asyncpg.exceptions.UniqueViolationError:
+            return aiohttp.web.json_response(data={"success": False,
+                                                   "message": "Username already exists"},
+                                             status=403
+                                             )
+        return aiohttp.web.json_response(data={"success": True,
+                                               "message": "Profile data updated"},
+                                         status=201
+                                         )
 
 
 @login_required
@@ -244,19 +270,23 @@ async def refresh(request, access_check):
     refresh_token = session[access_check]
     decoded_refresh = jwt_decode(refresh_token)
     if decoded_refresh == "Expired jwt":
-        return aiohttp.web.Response(text=json.dumps("You need to re-login"), status=403)
+        return aiohttp.web.json_response(data={"success": False,
+                                               "message": "You need to re-login"},
+                                         status=403
+                                         )
 
     # generating new tokens for user from token
     user_id = decoded_refresh["user_id"]
     new_access, new_refresh = generate_tokens(user_id)
-    print("rt:", new_refresh)
-    print("at: ", new_access)
 
     # updating session with new tokens
     session[str(new_access)] = str(new_refresh)
     session.changed()
 
-    return aiohttp.web.Response(text=json.dumps("User tokens refreshed"), status=200)
+    return aiohttp.web.json_response(data={"success": True,
+                                           "message": "User tokens refreshed"},
+                                     status=200
+                                     )
 
 
 @login_required
@@ -268,6 +298,7 @@ async def logout(request, access_check):
 
     session = await get_session(request)
     session.invalidate()
-    # del session[str(access_check)]
-    # session.pop(access_check)
-    return aiohttp.web.Response(text=json.dumps("User logout"), status=200)
+    return aiohttp.web.json_response(data={"success": True,
+                                           "message": "User logout"},
+                                     status=200
+                                     )

@@ -33,6 +33,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: db
       POSTGRES_HOST: db
+      SECRET: )i^px#4+7o3!50)+-igx5!y4xou7lj8s1@f5eyga7xt--@_vs@
     command: bash -c "python ./goods/manage.py migrate
                    && python ./goods/manage.py loaddata ./goods/goods_service/fixtures/initial_data.json
                    && python ./goods/manage.py runserver 0.0.0.0:8000"
@@ -60,6 +61,7 @@ services:
       REDIS_HOST: redis_db
       POSTGRES_DB: users
       POSTGRES_HOST: db
+      SECRET: YouShallNotPass!
     command: bash -c "cd user_service
                       && alembic upgrade head
                       && python start.py"

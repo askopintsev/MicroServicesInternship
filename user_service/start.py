@@ -6,4 +6,4 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    aiohttp.web.run_app(app, host="users", port=5000)
+    aiohttp.web.run_app(app, host="localhost", port=5000)
