@@ -75,5 +75,75 @@ services:
       db: 
         condition: service_healthy
 
+  rabbit:
+    build:
+      context: .
+      dockerfile: ./rabbit_dockerfile/Dockerfile
+      network: my_network     
+    hostname: rabbit
+    image: rabbit
+    environment:
+        - RABBITMQ_DEFAULT_USER=guest
+        - RABBITMQ_DEFAULT_PASS=guest
+    ports:
+        - "5672:5672"
+        - "15672:15672"
+
+  mails:
+    build:
+      context: .
+      dockerfile: ./mail_service/Dockerfile
+      network: my_network
+    environment:
+      POSTGRES_DB: mails
+      POSTGRES_HOST: db
+    command: bash -c "poetry run alembic upgrade head
+                      && poetry run uvicorn mail_service.asgi:app --reload --host 0.0.0.0 --port 8080
+                      "
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./mail_service:/src
+    depends_on:      
+      rabbit:
+        condition: service_started
+      db: 
+        condition: service_healthy
+
+  mail_sender:
+     build:
+       context: .
+       dockerfile: ./mail_sender/Dockerfile
+     command: bash -c "python mail_sender.py"
+       
+  monitoring:
+    build:
+      context: .
+      dockerfile: ./monitoring_service/Dockerfile
+      network: my_network
+    command: bash -c "poetry run alembic upgrade head
+                      && poetry run uvicorn monitoring_service.asgi:app --reload --host 0.0.0.0 --port 8888"
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./monitoring_service:/src
+    depends_on:      
+      rabbit:
+        condition: service_started
+      db: 
+        condition: service_healthy
+
+  celery:
+    build:
+      context: .
+      dockerfile: ./celery_worker/Dockerfile
+      network: my_network
+    command: bash -c "celery worker -A src.monitoring_service.tasks:app -P celery_pool_asyncio:TaskPool"
+    volumes:
+      - ./celery_worker/
+    depends_on:      
+      - monitoring
+      - rabbit
+
 volumes:
   postgres_data:
