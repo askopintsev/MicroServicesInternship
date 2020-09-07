@@ -11,7 +11,27 @@ class AdShortSerializer(serializers.ModelSerializer):
         fields = ("short_descr",)
 
 
-class AdFullSerializer(serializers.ModelSerializer):
+class AdPhotoSerializer(serializers.ModelSerializer):
+    """Provides Ad's image field to manage"""
+
+    class Meta:
+        model = Ad
+        fields = ("photo",)
+
+
+class AdUpdateSerializer(serializers.ModelSerializer):
+    """Provides Ad's fields for update"""
+
+    class Meta:
+        model = Ad
+        fields = (
+            "short_descr",
+            "full_descr",
+            "price",
+        )
+
+
+class AdShowFullSerializer(serializers.ModelSerializer):
     """Provides full data of Ad model"""
 
     class Meta:
@@ -19,6 +39,7 @@ class AdFullSerializer(serializers.ModelSerializer):
         fields = (
             "short_descr",
             "full_descr",
+            "tag",
             "views_cnt",
             "photo",
             "price",
