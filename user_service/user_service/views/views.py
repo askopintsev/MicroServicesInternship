@@ -1,5 +1,4 @@
 import datetime
-import json
 import os
 
 import aiohttp
@@ -8,10 +7,14 @@ import asyncpg
 import jwt
 import sqlalchemy as sa
 from aiohttp_session import get_session, new_session
-from functools import wraps
+
 from user_service import model
 
-SECRET = str(os.environ.get("SECRET"))
+from dotenv import load_dotenv
+load_dotenv()
+
+SECRET = os.getenv('SECRET')
+ALGORITHM = os.getenv('ALGORITHM')
 
 
 def generate_tokens(user_id):
@@ -39,14 +42,21 @@ def generate_tokens(user_id):
     return access_jwt, refresh_jwt
 
 
+class MyJWTError(Exception):
+    """Class of user-defined exception to handle JWT expiration cases"""
+
+    def __init__(self):
+        self.txt = "Expired jwt"
+
+
 def jwt_decode(jwt_token):
     """Function to check fact of jwt expiration.
     Returns decoded payload of jwt if it's OK or string 'Expired jwt'"""
 
     try:
-        decoded_jwt = jwt.decode(jwt_token, SECRET, algorithms="HS256")
-    except jwt.ExpiredSignatureError as err:
-        return str(err)
+        decoded_jwt = jwt.decode(jwt_token, SECRET, algorithms=ALGORITHM)
+    except jwt.ExpiredSignatureError:
+        raise MyJWTError
 
     return decoded_jwt
 
@@ -54,19 +64,15 @@ def jwt_decode(jwt_token):
 def login_required(func):
     """Decorator-function allows to pass to views for authorised users only"""
 
-    @wraps(func)
     async def wrapped(self, *args, **kwargs):
 
         # get access token string from header
-        access_check = self.headers.get("Authorization", None)
+        access_check = self.headers.get("Authorization", None)[7:]
         if access_check is None:
             return aiohttp.web.json_response(data={"success": False,
                                                    "reason": "User unauthorised"},
                                              status=403
                                              )
-
-        # remove 'Bearer ' string from access token string
-        access_check = access_check[7:]
 
         # check access token in session
         session = await get_session(self)
@@ -79,13 +85,10 @@ def login_required(func):
                                              )
 
         # check expiration of access token and decode access token payload
-        decoded_access = jwt_decode(access_check)
-
-        if decoded_access == "Expired jwt":
-            # that 'if' for tokens refresh feature
-            if self.path == "/refresh":
-                return await func(self, access_check, *args, **kwargs)
-            else:
+        if self.path != "/refresh":
+            try:
+                jwt_decode(access_check)
+            except MyJWTError:
                 return aiohttp.web.json_response(data={"success": False,
                                                        "reason": "You need to re-login"},
                                                  status=403
@@ -103,11 +106,12 @@ async def register(request):
 
     # getting user info from request
     try:
-        username = request.query["username"]
-        password = request.query["password"]
+        data = await request.post()
+        username = data["username"]
+        password = data["password"]
     except KeyError:
         return aiohttp.web.json_response(data={"success": False,
-                                               "message": "Username and password required"},
+                                               "reason": "Username and password required"},
                                          status=403
                                          )
 
@@ -115,20 +119,17 @@ async def register(request):
     async with request.app["db"].acquire() as conn:
         try:
             await conn.execute(
-                sa.insert(model.User).values(
-                    username=username,
-                    password=argon2.PasswordHasher().hash(password)
-                )
+                sa.insert(model.User).values(username=username,
+                                             password=argon2.PasswordHasher().hash(password))
             )
 
         except asyncpg.exceptions.UniqueViolationError:
             return aiohttp.web.json_response(data={"success": False,
-                                                   "message": "Username already exists"},
+                                                   "reason": "Username already exists"},
                                              status=403
                                              )
-
     return aiohttp.web.json_response(data={"success": True,
-                                           "message": "User " + username + " was created"},
+                                           "reason": "User " + username + " was created"},
                                      status=201
                                      )
 
@@ -140,11 +141,12 @@ async def login(request):
 
     # getting user info from request
     try:
-        username = request.query["username"]
-        password = request.query["password"]
+        data = await request.post()
+        username = data["username"]
+        password = data["password"]
     except KeyError:
         return aiohttp.web.json_response(data={"success": False,
-                                               "message": "Username and password required"},
+                                               "reason": "Username and password required"},
                                          status=403
                                          )
 
@@ -162,37 +164,41 @@ async def login(request):
                 argon2.PasswordHasher().verify(pass_db, password)
             except argon2.exceptions.VerifyMismatchError:
                 return aiohttp.web.json_response(data={"success": False,
-                                                       "message": "Wrong password"},
+                                                       "reason": "Wrong username or password"},
                                                  status=403
                                                  )
+
+            # creating tokens
+            access_jwt, refresh_jwt = generate_tokens(user_id)
 
             # creating session
             session = await new_session(request)
 
-            # creating tokens
-            access_jwt, refresh_jwt = generate_tokens(user_id)
-            print("rt:", refresh_jwt)
-            print("at: ", access_jwt)
-
             # save tokens to session
             session[str(access_jwt)] = str(refresh_jwt)
 
-            return aiohttp.web.json_response(data={"success": True,
-                                                   "message": "You are logged"},
-                                             status=200
-                                             )
+            # work with response
+            response = aiohttp.web.json_response(data={"success": True,
+                                                       "reason": "You are logged"},
+                                                 headers={"Authorization": access_jwt},
+                                                 status=200
+                                                 )
+            response.set_cookie("rt", str(refresh_jwt), max_age=10800, httponly=True)
+            return response
+
         else:
             return aiohttp.web.json_response(data={"success": False,
-                                                   "message": "User not found"},
+                                                   "reason": "Wrong username or password"},
                                              status=403
                                              )
 
 
 @login_required
 async def profile(request, access_check):
-    """View for user information.
+    """View for user information. By default shows user info based on user_id from token.
     Accepts input param 'access_check' as decoded access token payload from wrapper function login_required.
-    Shows user info based on user_id from token."""
+    Accepts non-obligatory 'new_username' and 'new_password' params from request
+    and updates user profile if they are not empty"""
 
     # getting user_if from current access token
     decoded_access = jwt_decode(access_check)
@@ -204,14 +210,19 @@ async def profile(request, access_check):
     # retrieve user profile data block
     async with request.app["db"].acquire() as conn:
         result = await conn.fetchrow(query_select)
-    user_id = str(result["id"])
-    username = result["username"]
-    password = result["password"]
+
+    try:
+        username = result["username"]
+        user_id = str(result["id"])
+    except TypeError:
+        return aiohttp.web.json_response(data={"success": False,
+                                               "reason": "User not found"},
+                                         status=403
+                                         )
 
     return aiohttp.web.json_response(data={"success": True,
-                                           "message": {"user_id": user_id,
-                                                       "username": username,
-                                                       "password": password}
+                                           "profile data": {"user_id": user_id,
+                                                            "username": username}
                                            },
                                      status=200
                                      )
@@ -219,7 +230,7 @@ async def profile(request, access_check):
 
 @login_required
 async def profile_update(request, access_check):
-    """View for updating user information.
+    """View for user information. By default shows user info based on user_id from token.
     Accepts input param 'access_check' as decoded access token payload from wrapper function login_required.
     Accepts non-obligatory 'new_username' and 'new_password' params from request
     and updates user profile if they are not empty"""
@@ -228,10 +239,11 @@ async def profile_update(request, access_check):
     decoded_access = jwt_decode(access_check)
     user_id = decoded_access["user_id"]
 
-    # getting params for profile update
-    new_username = request.query.get("new_username", None)
-    new_password = request.query.get("new_password", None)
+    data = await request.post()
+    new_username = data.get("new_username", None)
+    new_password = data.get("new_password", None)
     update_dict = {}
+
     if new_username:
         update_dict["username"] = new_username
     if new_password:
@@ -248,12 +260,12 @@ async def profile_update(request, access_check):
             await conn.fetchrow(query_update)
         except asyncpg.exceptions.UniqueViolationError:
             return aiohttp.web.json_response(data={"success": False,
-                                                   "message": "Username already exists"},
+                                                   "reason": "Username already exists"},
                                              status=403
                                              )
         return aiohttp.web.json_response(data={"success": True,
-                                               "message": "Profile data updated"},
-                                         status=201
+                                               "reason": "Profile data updated"},
+                                         status=200
                                          )
 
 
@@ -267,11 +279,19 @@ async def refresh(request, access_check):
     session = await get_session(request)
 
     # get and check refresh token
-    refresh_token = session[access_check]
-    decoded_refresh = jwt_decode(refresh_token)
-    if decoded_refresh == "Expired jwt":
+    refresh_token_db = session[access_check]
+    refresh_token_rq = request.cookies.get('rt')
+
+    if refresh_token_db != refresh_token_rq:
         return aiohttp.web.json_response(data={"success": False,
-                                               "message": "You need to re-login"},
+                                               "reason": "You need to re-login"},
+                                         status=403
+                                         )
+    try:
+        decoded_refresh = jwt_decode(refresh_token_rq)
+    except MyJWTError:
+        return aiohttp.web.json_response(data={"success": False,
+                                               "reason": "You need to re-login"},
                                          status=403
                                          )
 
@@ -283,10 +303,15 @@ async def refresh(request, access_check):
     session[str(new_access)] = str(new_refresh)
     session.changed()
 
-    return aiohttp.web.json_response(data={"success": True,
-                                           "message": "User tokens refreshed"},
-                                     status=200
-                                     )
+    # work with response
+    response = aiohttp.web.json_response(data={"success": True,
+                                               "reason": "User tokens refreshed"},
+                                         headers={"Authorization": new_access},
+                                         status=201
+                                         )
+    response.del_cookie("rt")
+    response.set_cookie("rt", str(new_refresh), max_age=10800, httponly=True)
+    return response
 
 
 @login_required
@@ -298,7 +323,9 @@ async def logout(request, access_check):
 
     session = await get_session(request)
     session.invalidate()
+    # del session[str(access_check)]
+    # session.pop(access_check)
     return aiohttp.web.json_response(data={"success": True,
-                                           "message": "User logout"},
+                                           "reason": "User logout"},
                                      status=200
                                      )

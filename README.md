@@ -254,14 +254,12 @@ maximum available price.
 Request allows to work with image of ad: add image, 
 update image, delete image
 
-**URL:** api/ad/id/image/id/command/?image_url=value
+**URL:** api/ad/id/image/?photo=value
 
 id - required parameter - ID of the requested ad (digit)
 
-command - required parameter - type of action with image
-in add. Allowed values: _add_, _update_, _delete_.
-If value is _add_ or _update_ then 'image_url' parameter
- is required
- 
-image_url - required parameter in case of command=add
- or update - url to selected image for id (url)
+photo - required parameter
+* in case of add or update image - you need to provide 
+ url to selected image for id (url)
+* in case of delete image - you need to pass as value 
+string 'delete'

@@ -1,7 +1,7 @@
 """empty message
 
 Revision ID: eee3de9766ed
-Revises: None
+Revises:
 Create Date: 2020-07-28 12:51:28.277978
 
 """
