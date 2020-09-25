@@ -57,7 +57,6 @@ class AdFullDescrView(generics.RetrieveUpdateAPIView):
 
     # for PUT/PATCH requests
     def update(self, request, *args, **kwargs):
-
         partial = kwargs.get("partial", False)
 
         instance = self.get_object()
