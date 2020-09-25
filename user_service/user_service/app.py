@@ -11,6 +11,10 @@ from aiohttp_session.redis_storage import RedisStorage
 from .routes import setup_routes
 
 
+DB_HOST = os.environ.get("POSTGRES_HOST", default="localhost")
+REDIS_HOST = os.environ.get("REDIS_HOST", default="localhost")
+
+
 async def create_app():
     app = web.Application()
 
@@ -18,7 +22,7 @@ async def create_app():
     aiohttp_swagger.setup_swagger(app, swagger_url="/api/v1/doc", ui_version=2)
 
     redis = await aioredis.create_pool(
-        (os.environ.get("REDIS_HOST", default="localhost"), 6379)
+        (REDIS_HOST, 6379)
     )
 
     aiohttp_session.setup(app, RedisStorage(redis))
@@ -31,7 +35,7 @@ async def create_app():
 
 async def on_start(app):
     app["db"] = await asyncpgsa.create_pool(
-        dsn="postgresql://postgres:postgres@db:5432/users"
+        dsn="postgresql://postgres:postgres@" + str(DB_HOST) + ":5432/users"
     )
 
 

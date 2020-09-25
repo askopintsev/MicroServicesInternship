@@ -57,6 +57,7 @@ services:
       dockerfile: ./user_service/Dockerfile
       network: my_network
     environment:
+      HOST: users
       REDIS_HOST: redis_db
       POSTGRES_DB: users
       POSTGRES_HOST: db

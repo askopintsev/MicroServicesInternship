@@ -1,7 +1,7 @@
 """empty message
 
 Revision ID: eee3de9766ed
-Revises: 02b8a7982a4f
+Revises:
 Create Date: 2020-07-28 12:51:28.277978
 
 """
@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "eee3de9766ed"
-down_revision = "02b8a7982a4f"
+down_revision = None
 branch_labels = None
 depends_on = None
 
