@@ -10,7 +10,7 @@ asyncpgsa==0.26.3
 attrs==19.3.0
 cffi==1.14.0
 chardet==3.0.4
-cryptography==2.9.2
+cryptography==3.2
 hiredis==1.1.0
 idna==2.10
 Jinja2==2.11.2
