@@ -1,26 +1,15 @@
-import logging
-from importlib.metadata import entry_points
-
 from fastapi import FastAPI
 
-from .models import db
+from monitoring_service.src.monitoring_service.database import db
+from monitoring_service.src.monitoring_service.views.views import router
 
 
 def get_app():
     app = FastAPI(title="AviDjango monitoring service")
+    app.include_router(router)
     db.init_app(app)
-    load_modules(app)
+
     return app
 
 
-logger = logging.getLogger(__name__)
-
-
-def load_modules(app=None):
-    for ep in entry_points()["monitoring_service.modules"]:
-        logger.info("Loading module: %s", ep.name)
-        mod = ep.load()
-        if app:
-            init_app = getattr(mod, "init_app", None)
-            if init_app:
-                init_app(app)
+app = get_app()

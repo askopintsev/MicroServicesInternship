@@ -18,7 +18,7 @@ async def send_email(content):
     message.set_content(str(content))
 
     await aiosmtplib.send(message,
-                          hostname="smtp.yandex.ru",
+                          hostname=os.environ.get("SMTP_SERVER"),
                           port=465,
                           username=os.environ.get("SENDER_MAIL"),
                           password=os.environ.get("SENDER_PASS"),

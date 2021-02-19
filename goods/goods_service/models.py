@@ -16,7 +16,7 @@ class Ad(models.Model):
     full_descr = models.CharField(max_length=500)
     views_cnt = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(auto_now_add=True)
     photo = models.CharField(max_length=500, null=True)
     price = models.IntegerField(null=False, default=0)
     tag = models.ManyToManyField(Tag)

@@ -1,19 +1,20 @@
 import os
 from datetime import datetime
 
-import celery_pool_asyncio
 from celery import Celery
 from dotenv import load_dotenv
 from gino import create_engine
 
-from .config import DB_DSN
-from .models.events import Event
+from monitoring_service.src.monitoring_service.config import DB_DSN
+from monitoring_service.src.monitoring_service.models.models import Event
 
 load_dotenv()
-login = str(os.environ.get("RABBIT_USER"))
-password = str(os.environ.get("RABBIT_PASSWORD"))
+login = str(os.environ.get("RABBITMQ_USER"))
+password = str(os.environ.get("RABBITMQ_PASS"))
 
-app = Celery("tasks", broker="amqp://" + login + ":" + password + "@rabbit:5672")
+broker = "amqp://guest:guest@rabbit:5672"
+
+app = Celery("tasks", broker=broker)
 
 
 @app.task(name="tasks.add_to_db")
@@ -21,11 +22,13 @@ async def add_to_db(request_timestamp, service, url, status_code, response_time)
 
     engine = await create_engine(DB_DSN)
     await Event.create(
-        request_timestamp=datetime.fromisoformat(request_timestamp),
+        request_timestamp=datetime.strptime(request_timestamp, '%Y-%m-%dT%H:%M:%S.%fZ'),
         service=service,
         url=url,
         status_code=status_code,
-        response_time=datetime.fromisoformat(response_time),
+        response_time=datetime.strptime(response_time, '%Y-%m-%dT%H:%M:%S.%fZ'),
         bind=engine,
     )
     await engine.close()
+
+    return {"status": True}

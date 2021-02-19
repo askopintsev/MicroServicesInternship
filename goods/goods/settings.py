@@ -91,12 +91,6 @@ DATABASES = {
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", default="postgres"),
         "HOST": os.environ.get("POSTGRES_HOST", default="localhost"),
         "PORT": 5432,
-        # "ENGINE": "django.db.backends.postgresql_psycopg2",
-        # "NAME": "db",
-        # "USER": "postgres",
-        # "PASSWORD": "postgres",
-        # "HOST": "localhost",
-        # "PORT": 5432,
     }
 }
 

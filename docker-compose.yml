@@ -5,8 +5,7 @@ services:
     image: db
     build:
       context: .
-      dockerfile: ./postgre_dockerfile/Dockerfile
-      network: my_network
+      dockerfile: ./postgre_dockerfile/Dockerfile 
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -15,7 +14,7 @@ services:
     volumes:
       - postgres_data:/var/lib/posgresql/data/
     ports:
-      - "5432:5432"
+      - "5416:5432"
     restart: always
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -27,7 +26,6 @@ services:
     build:
       context: .
       dockerfile: ./goods/Dockerfile
-      network: my_network
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -56,7 +54,6 @@ services:
     build:
       context: .
       dockerfile: ./user_service/Dockerfile
-      network: my_network
     environment:
       HOST: users
       REDIS_HOST: redis_db
@@ -79,8 +76,7 @@ services:
   rabbit:
     build:
       context: .
-      dockerfile: ./rabbit_dockerfile/Dockerfile
-      network: my_network     
+      dockerfile: ./rabbit_dockerfile/Dockerfile    
     hostname: rabbit
     image: rabbit
     environment:
@@ -94,7 +90,6 @@ services:
     build:
       context: .
       dockerfile: ./mail_service/Dockerfile
-      network: my_network
     environment:
       POSTGRES_DB: mails
       POSTGRES_HOST: db
@@ -115,19 +110,25 @@ services:
      build:
        context: .
        dockerfile: ./mail_sender/Dockerfile
+     environment:
+       SENDER_MAIL: milleniumfalcon2@yandex.ru
+       SENDER_PASS: Jedi990305
+       SMTP_SERVER: smtp.yandex.ru
+       RABBIT_USER: guest
+       RABBIT_PASSWORD: guest
      command: bash -c "python mail_sender.py"
        
   monitoring:
     build:
       context: .
       dockerfile: ./monitoring_service/Dockerfile
-      network: my_network
     command: bash -c "poetry run alembic upgrade head
-                      && poetry run uvicorn monitoring_service.asgi:app --reload --host 0.0.0.0 --port 8888"
+                      && poetry run uvicorn monitoring_service.src.monitoring_service.main:app
+                         --reload --host 0.0.0.0 --port 8888"
     ports:
       - "8888:8888"
     volumes:
-      - ./monitoring_service:/src
+      - .:/monitoring_service/src
     depends_on:      
       rabbit:
         condition: service_started
@@ -138,13 +139,33 @@ services:
     build:
       context: .
       dockerfile: ./celery_worker/Dockerfile
-      network: my_network
-    command: bash -c "celery worker -A src.monitoring_service.tasks:app -P celery_pool_asyncio:TaskPool"
+    environment:
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+    command: bash -c "cd /celery
+                      && celery worker -A monitoring_service.src.monitoring_service.worker.celery_worker -l info -Q celery -c 1"
     volumes:
-      - ./celery_worker/
+      - .:/celery
     depends_on:      
       - monitoring
       - rabbit
+    links:
+      - rabbit
+
+  celery-flower:
+    image: gregsi/latest-celery-flower-docker:latest
+    environment:
+      - AMQP_USERNAME=guest
+      - AMQP_PASSWORD=guest
+      - AMQP_ADMIN_USERNAME=user
+      - AMQP_ADMIN_PASSWORD=bitnami
+      - AMQP_HOST=rabbit
+      - AMQP_PORT=5672
+      - AMQP_ADMIN_HOST=rabbit
+      - AMQP_ADMIN_PORT=15672
+      - FLOWER_BASIC_AUTH=user:test
+    ports:
+      - "5555:5555"
 
 volumes:
   postgres_data:

@@ -15,10 +15,9 @@ fileConfig(config.config_file_name)
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from monitoring_service.config import DB_DSN
-from monitoring_service.main import db, load_modules
+from monitoring_service.src.monitoring_service.config import DB_DSN
+from monitoring_service.src.monitoring_service.database import db
 
-load_modules()
 config.set_main_option("sqlalchemy.url", str(DB_DSN))
 target_metadata = db
 
