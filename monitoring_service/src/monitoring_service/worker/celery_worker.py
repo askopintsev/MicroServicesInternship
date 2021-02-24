@@ -24,19 +24,3 @@ async def add_to_db(request_timestamp, service, url, status_code, response_time)
 def add_to_db_task(request_timestamp, service, url, status_code, response_time):
     asyncio.run(add_to_db(request_timestamp, service, url, status_code, response_time))
     return {"status": True}
-
-# @celery_app.task(acks_late=True)
-# async def add_to_db(request_timestamp, service, url, status_code, response_time):
-#     # event = await Event.create(**event_data)
-#     event = Event(
-#         request_timestamp=datetime.strptime(request_timestamp, '%Y-%m-%dT%H:%M:%S.%f'),
-#         service=service,
-#         url=url,
-#         status_code=status_code,
-#         response_time=datetime.strptime(response_time, '%Y-%m-%dT%H:%M:%S.%f'),
-#     )
-#
-#     print(event)
-#     await event.create()
-#
-#     return {"status": True}

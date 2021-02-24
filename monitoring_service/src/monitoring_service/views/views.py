@@ -17,7 +17,6 @@ async def add_event(event: EventModel):
                   'response_time': event.response_time.replace(tzinfo=None)
                   }
 
-    # event = await Event.create(**event_data)
     task = celery_app.send_task("monitoring_service.src.monitoring_service.worker.celery_worker.add_to_db_task",
                                 kwargs=event_data)
 

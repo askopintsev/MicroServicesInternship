@@ -93,13 +93,15 @@ services:
     environment:
       POSTGRES_DB: mails
       POSTGRES_HOST: db
+      RABBIT_USER: guest
+      RABBIT_PASSWORD: guest
     command: bash -c "poetry run alembic upgrade head
-                      && poetry run uvicorn mail_service.asgi:app --reload --host 0.0.0.0 --port 8080
-                      "
+                      && poetry run uvicorn mail_service.src.mail_service.main:app
+                         --reload --host 0.0.0.0 --port 8080"
     ports:
       - "8080:8080"
     volumes:
-      - ./mail_service:/src
+      - .:/mail_service/src
     depends_on:      
       rabbit:
         condition: service_started
@@ -111,12 +113,14 @@ services:
        context: .
        dockerfile: ./mail_sender/Dockerfile
      environment:
-       SENDER_MAIL: milleniumfalcon2@yandex.ru
-       SENDER_PASS: Jedi990305
-       SMTP_SERVER: smtp.yandex.ru
        RABBIT_USER: guest
        RABBIT_PASSWORD: guest
      command: bash -c "python mail_sender.py"
+     depends_on:
+       - mails
+       - rabbit
+     links:
+       - rabbit
        
   monitoring:
     build:

@@ -16,13 +16,11 @@ fileConfig(config.config_file_name)
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 
-from mail_service.config import DB_DSN
-from mail_service.main import db, load_modules
+from mail_service.src.mail_service.config import DB_DSN
+from mail_service.src.mail_service.database import db
 
-load_modules()
 config.set_main_option("sqlalchemy.url", str(DB_DSN))
 target_metadata = db
-
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

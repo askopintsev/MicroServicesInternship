@@ -4,10 +4,12 @@ from dotenv import load_dotenv
 
 import aiosmtplib
 import asyncio
-import pika
+import aio_pika
 
 
 load_dotenv()
+rabbit_user = os.environ.get("RABBIT_USER")
+rabbit_pass = os.environ.get("RABBIT_PASSWORD")
 
 
 async def send_email(content):
@@ -26,32 +28,37 @@ async def send_email(content):
                           )
 
 
-def callback(ch, method, properties, body):
-    asyncio.run(send_email(body.decode("utf-8")))
+async def process_message(message: aio_pika.IncomingMessage):
+    async with message.process():
+        await send_email(message.body.decode("utf-8"))
 
 
-while True:
-    credentials = pika.PlainCredentials(os.environ.get("RABBIT_USER"),
-                                        os.environ.get("RABBIT_PASSWORD")
-                                        )
+async def main(loop):
 
-    parameters = pika.ConnectionParameters('rabbit',
-                                           5672,
-                                           '/',
-                                           credentials)
+    connection = await aio_pika.connect_robust(f"amqp://{rabbit_user}:{rabbit_pass}@rabbit:5672/", loop=loop)
+
+    queue_name = "mails"
+
+    # Creating channel
+    channel = await connection.channel()
+
+    # Maximum message count which will be
+    # processing at the same time.
+    await channel.set_qos(prefetch_count=100)
+
+    # Declaring queue
+    queue = await channel.declare_queue(queue_name, auto_delete=True)
+
+    await queue.consume(process_message)
+
+    return connection
+
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    connection = loop.run_until_complete(main(loop))
+
     try:
-        connection = pika.BlockingConnection(parameters)
-
-        channel = connection.channel()
-        channel.queue_declare(queue='mails')
-        channel.basic_consume('mails', callback, auto_ack=True)
-        channel.start_consuming()
-    # Don't recover if connection was closed by broker
-    except pika.exceptions.ConnectionClosedByBroker:
-        break
-    # Don't recover on channel errors
-    except pika.exceptions.AMQPChannelError:
-        break
-    # Recover on all other connection errors
-    except pika.exceptions.AMQPConnectionError:
-        continue
+        loop.run_forever()
+    finally:
+        loop.run_until_complete(connection.close())
