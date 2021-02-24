@@ -1,5 +1,88 @@
 # AviDjango service documentation
 
+### Mail_service API description
+Mail_service API provides the following features:
+<hr/>
+
+* **Retrieve single mail template**
+
+**URL:**  /mails/mail_id
+
+Obligatory parameters:
+
+- mail_id - id of mail template (integer)
+
+<hr/>
+
+* **Retrieve all mails templates**
+
+**URL:**  /mails
+
+Call of this endpoint will provides you full list of 
+created mail templates.
+
+<hr/>
+
+* **Create mail template**
+
+**URL:**  /mails/add
+
+Obligatory parameters:
+
+- text - text of mail template (string)
+
+Creating mail template string you can use placeholders to
+format text in future use. Available placeholders:
+- {username},
+- {password},
+- {short_descr},
+- {full_descr},
+- {price},
+- {created_at}
+
+<hr/>
+
+* **Delete mail template**
+
+**URL:**  /mails/delete/mail_id
+
+Obligatory parameters:
+
+- mail_id - id of mail template (integer)
+
+Call of this endpoint will provides you deletion of 
+chosen mail template.
+
+<hr/>
+
+* **Send mail template**
+
+**URL:**  /send/mail_id
+
+Obligatory parameters:
+
+- mail_id - id of mail template (integer)
+
+Call of this endpoint will provides you sending of selected 
+mail to addressee.
+
+<hr/>
+
+### Monitoring_service API description
+Monitoring_service provides functionality for service's calls logging.
+For correct call of service you need to use endpoint:
+
+**URL:**  /events
+
+System accepts the following parameters:
+ - "request_timestamp" - datetime mark of request like: "2020-08-17 08:31:36",
+ - "service" - service name string like: "User_service",
+ - "url" - url of service request like,
+ - "status_code" - code of service response (integer) like: 200,
+ - "response_time" - datetime mark of request like: "2020-08-17 08:31:36"
+<hr/>
+
+
 ### User_service API description
 User_service API provides the following features:
 <hr/>
