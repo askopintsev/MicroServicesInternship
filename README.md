@@ -1,5 +1,27 @@
 # AviDjango service documentation
 
+This project was made during internship to work with popular frameworks and try to build microservice architecture.
+Serivices are based on different approaches to get the best experience.
+Services are built on REST logic, with dockerization.
+Technologies applied:
+- postgreSQL as shared database
+- goods service:
+   - django framework
+   - django restframework
+- user service:
+   - aiohttp
+   - sqlalchemy + alembic
+   - redis as operational database
+- monitoring service:
+   - fastAPI
+   - GinoORM + alembic
+   - rabbitMQ for message queue
+   - celery for worker consuming messages from queue
+- mail service:
+   - fastAPI
+   - GinoORM + alembic
+   - rabbitMQ for sending mails queue
+
 ### Mail_service API description
 Mail_service API provides the following features:
 <hr/>
